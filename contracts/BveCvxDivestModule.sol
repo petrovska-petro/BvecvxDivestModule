@@ -28,7 +28,7 @@ contract BveCvxDivestModule is
 
     /* ========== STATE VARIABLES ========== */
     address public guardian;
-    address public initialcvxTimestampWeekSelling;
+    uint256 public initialcvxTimestampWeekSelling;
     uint256 public weeklyCvxSold;
 
     EnumerableSet.AddressSet internal _executors;
@@ -123,7 +123,7 @@ contract BveCvxDivestModule is
         whenNotPaused
         returns (bool upkeepNeeded, bytes memory checkData)
     {
-        uint256 totalWdBveCvx = totalBvecvxWithdrawable();
+        uint256 totalWdBveCvx = totalCvxWithdrawable();
         uint256 bveCVXSafeBal = BVE_CVX.balanceOf(address(SAFE));
 
         // NOTE: if there is anything available to wd, keeper will proceed & ts lower than 00:00 utc 6th Jan
@@ -162,7 +162,7 @@ contract BveCvxDivestModule is
     function _withdrawBveCvx() internal {
         uint256 bveCVXSafeBal = BVE_CVX.balanceOf(address(SAFE));
         if (bveCVXSafeBal > 0) {
-            uint256 totalWdBveCvx = totalBvecvxWithdrawable();
+            uint256 totalWdBveCvx = totalCvxWithdrawable();
             /// @dev covers corner case when nothing might be withdrawable
             if (totalWdBveCvx > 0) {
                 uint256 bveCvxBalance = BVE_CVX.balance();
@@ -184,14 +184,14 @@ contract BveCvxDivestModule is
         uint256 cvxBal = CVX.balanceOf(address(SAFE));
         if (cvxBal > 0) {
             /// @dev will be used as condition to limit amount sold weekly
-            if (block.timestamp > lastRewardClaimTimestamp + ONE_WEEK) {
+            if (block.timestamp > initialcvxTimestampWeekSelling + ONE_WEEK) {
                 initialcvxTimestampWeekSelling = block.timestamp;
                 weeklyCvxSold = 0;
             }
 
             // NOTE: limit the spot selling given 5k/weekly limit
             uint256 cvxSpotSellLimit = MAX_WEEKLY_CVX_SPOT - weeklyCvxSold;
-            uint245 cvxSpotSell = cvxSpotSellLimit > cvxBal
+            uint256 cvxSpotSell = cvxSpotSellLimit > cvxBal
                 ? cvxBal
                 : weeklyCvxSold;
             weeklyCvxSold += cvxSpotSell;
@@ -212,7 +212,7 @@ contract BveCvxDivestModule is
                     (
                         1,
                         0,
-                        cvxcvxSpotSellBal,
+                        cvxSpotSell,
                         (getCvxAmountInEth(cvxSpotSell) * MIN_OUT_SWAP) /
                             MAX_BPS
                     )
@@ -279,16 +279,12 @@ contract BveCvxDivestModule is
     }
 
     /// @dev returns the total amount withdrawable at current moment
-    /// @return totalWdBvecvx Total amount of CVX withdrawable, summation of available in vault, strat and unlockable
-    function totalBvecvxWithdrawable()
-        public
-        view
-        returns (uint256 totalWdBvecvx)
-    {
+    /// @return totalWdCvx Total amount of CVX withdrawable, summation of available in vault, strat and unlockable
+    function totalCvxWithdrawable() public view returns (uint256 totalWdCvx) {
         /// @dev check avail CONVEX to avoid wd reverts
         uint256 cvxInVault = CVX.balanceOf(address(BVE_CVX));
         uint256 cvxInStrat = CVX.balanceOf(address(BVECVX_STRAT));
         (, uint256 unlockableStrat, , ) = LOCKER.lockedBalances(BVECVX_STRAT);
-        totalWdBvecvx = cvxInVault + cvxInStrat + unlockableStrat;
+        totalWdCvx = cvxInVault + cvxInStrat + unlockableStrat;
     }
 }
