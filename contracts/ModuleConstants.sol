@@ -59,4 +59,5 @@ abstract contract ModuleConstants {
 
     // max selling spot weekly
     uint256 constant MAX_WEEKLY_CVX_SPOT = 5_000e18;
+    uint256 constant ONE_WEEK = 1 weeks;
 }

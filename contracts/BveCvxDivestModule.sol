@@ -28,6 +28,8 @@ contract BveCvxDivestModule is
 
     /* ========== STATE VARIABLES ========== */
     address public guardian;
+    address public initialcvxTimestampWeekSelling;
+    uint256 public weeklyCvxSold;
 
     EnumerableSet.AddressSet internal _executors;
 
@@ -181,14 +183,26 @@ contract BveCvxDivestModule is
     function _swapCvxForWeth() internal {
         uint256 cvxBal = CVX.balanceOf(address(SAFE));
         if (cvxBal > 0) {
-            // NOTE: limit the spot selling at 5k weekly
-            uint256 cvxWeeklySpot = cvxBal > MAX_WEEKLY_CVX_SPOT
-                ? MAX_WEEKLY_CVX_SPOT
-                : cvxBal;
+            /// @dev will be used as condition to limit amount sold weekly
+            if (block.timestamp > lastRewardClaimTimestamp + ONE_WEEK) {
+                initialcvxTimestampWeekSelling = block.timestamp;
+                weeklyCvxSold = 0;
+            }
+
+            // NOTE: limit the spot selling given 5k/weekly limit
+            uint256 cvxSpotSellLimit = MAX_WEEKLY_CVX_SPOT - weeklyCvxSold;
+            uint245 cvxSpotSell = cvxSpotSellLimit > cvxBal
+                ? cvxBal
+                : weeklyCvxSold;
+            weeklyCvxSold += cvxSpotSell;
+
             // 1. Approve CVX into curve pool
             _checkTransactionAndExecute(
                 address(CVX),
-                abi.encodeCall(IERC20.approve, (CVX_ETH_CURVE_POOL, cvxBal))
+                abi.encodeCall(
+                    IERC20.approve,
+                    (CVX_ETH_CURVE_POOL, cvxSpotSell)
+                )
             );
             // 2. Swap CVX -> WETH
             _checkTransactionAndExecute(
@@ -198,8 +212,9 @@ contract BveCvxDivestModule is
                     (
                         1,
                         0,
-                        cvxBal,
-                        (getCvxAmountInEth(cvxBal) * MIN_OUT_SWAP) / MAX_BPS
+                        cvxcvxSpotSellBal,
+                        (getCvxAmountInEth(cvxSpotSell) * MIN_OUT_SWAP) /
+                            MAX_BPS
                     )
                 )
             );
