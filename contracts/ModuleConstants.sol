@@ -56,4 +56,7 @@ abstract contract ModuleConstants {
 
     // hardcoded timestamp where keeper always should return `false`
     uint256 constant KEEPER_DEADLINE = 1672963200;
+
+    // max selling spot weekly
+    uint256 constant MAX_WEEKLY_CVX_SPOT = 5_000e18;
 }

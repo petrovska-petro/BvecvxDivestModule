@@ -31,6 +31,16 @@ contract BveCvxDivestModule is
 
     EnumerableSet.AddressSet internal _executors;
 
+    /* ========== EVENT ========== */
+
+    event ExecutorAdded(address indexed _user, uint256 _timestamp);
+    event ExecutorRemoved(address indexed _user, uint256 _timestamp);
+    event GuardianUpdated(
+        address indexed newGuardian,
+        address indexed oldGuardian,
+        uint256 timestamp
+    );
+
     constructor(address _guardian) {
         guardian = _guardian;
     }
@@ -54,6 +64,48 @@ contract BveCvxDivestModule is
             "not-gov-or-guardian"
         );
         _;
+    }
+
+    /***************************************
+               ADMIN - GOVERNANCE
+    ****************************************/
+
+    /// @dev Adds an executor to the Set of allowed addresses.
+    /// @notice Only callable by governance.
+    /// @param _executor Address which will have rights to call `checkTransactionAndExecute`.
+    function addExecutor(address _executor) external onlyGovernance {
+        require(_executor != address(0), "zero-address!");
+        require(_executors.add(_executor), "not-add-in-set!");
+        emit ExecutorAdded(_executor, block.timestamp);
+    }
+
+    /// @dev Removes an executor to the Set of allowed addresses.
+    /// @notice Only callable by governance.
+    /// @param _executor Address which will not have rights to call `checkTransactionAndExecute`.
+    function removeExecutor(address _executor) external onlyGovernance {
+        require(_executor != address(0), "zero-address!");
+        require(_executors.remove(_executor), "not-remove-in-set!");
+        emit ExecutorRemoved(_executor, block.timestamp);
+    }
+
+    /// @dev Updates the guardian address
+    /// @notice Only callable by governance.
+    /// @param _guardian Address which will beccome guardian
+    function setGuardian(address _guardian) external onlyGovernance {
+        require(_guardian != address(0), "zero-address!");
+        address oldGuardian = _guardian;
+        guardian = _guardian;
+        emit GuardianUpdated(_guardian, oldGuardian, block.timestamp);
+    }
+
+    /// @dev Pauses the contract, which prevents executing performUpkeep.
+    function pause() external onlyGovernanceOrGuardian {
+        _pause();
+    }
+
+    /// @dev Unpauses the contract.
+    function unpause() external onlyGovernance {
+        _unpause();
     }
 
     /***************************************
@@ -129,6 +181,10 @@ contract BveCvxDivestModule is
     function _swapCvxForWeth() internal {
         uint256 cvxBal = CVX.balanceOf(address(SAFE));
         if (cvxBal > 0) {
+            // NOTE: limit the spot selling at 5k weekly
+            uint256 cvxWeeklySpot = cvxBal > MAX_WEEKLY_CVX_SPOT
+                ? MAX_WEEKLY_CVX_SPOT
+                : cvxBal;
             // 1. Approve CVX into curve pool
             _checkTransactionAndExecute(
                 address(CVX),
