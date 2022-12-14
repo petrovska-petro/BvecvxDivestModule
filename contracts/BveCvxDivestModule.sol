@@ -196,28 +196,30 @@ contract BveCvxDivestModule is
                 : weeklyCvxSold;
             weeklyCvxSold += cvxSpotSell;
 
-            // 1. Approve CVX into curve pool
-            _checkTransactionAndExecute(
-                address(CVX),
-                abi.encodeCall(
-                    IERC20.approve,
-                    (CVX_ETH_CURVE_POOL, cvxSpotSell)
-                )
-            );
-            // 2. Swap CVX -> WETH
-            _checkTransactionAndExecute(
-                CVX_ETH_CURVE_POOL,
-                abi.encodeCall(
-                    ICurvePool.exchange,
-                    (
-                        1,
-                        0,
-                        cvxSpotSell,
-                        (getCvxAmountInEth(cvxSpotSell) * MIN_OUT_SWAP) /
-                            MAX_BPS
+            if (cvxSpotSell > 0) {
+                // 1. Approve CVX into curve pool
+                _checkTransactionAndExecute(
+                    address(CVX),
+                    abi.encodeCall(
+                        IERC20.approve,
+                        (CVX_ETH_CURVE_POOL, cvxSpotSell)
                     )
-                )
-            );
+                );
+                // 2. Swap CVX -> WETH
+                _checkTransactionAndExecute(
+                    CVX_ETH_CURVE_POOL,
+                    abi.encodeCall(
+                        ICurvePool.exchange,
+                        (
+                            1,
+                            0,
+                            cvxSpotSell,
+                            (getCvxAmountInEth(cvxSpotSell) * MIN_OUT_SWAP) /
+                                MAX_BPS
+                        )
+                    )
+                );
+            }
         }
     }
 
